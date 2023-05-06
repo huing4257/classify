@@ -17,8 +17,8 @@ if __name__ == '__main__':
     test_iter = data_util.test_iter
 
     embed_size, kernel_sizes, nums_channels = 100, [3, 4, 5], [100, 100, 100]
-    net = TextCNN(embed, kernel_sizes, nums_channels, 0.5)
-    lr, num_epochs = 0.001, 5
+    net = TextCNN(embed, kernel_sizes, nums_channels, 0.1)
+    lr, num_epochs = 0.01, 5
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=lr)
     loss_fn = torch.nn.CrossEntropyLoss()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -62,7 +62,7 @@ if __name__ == '__main__':
         for batch_idx, (data, target) in enumerate(test_iter):
             # print (data.shape)
 
-            data = torch.as_tensor(data, dtype=torch.float32)
+            data = torch.as_tensor(data, dtype=torch.long)
             target = target.long()  ##要保证label的数据类型是long
             optimizer.zero_grad()
             data, target = data.to(device), target.to(device)  # 将数据放入GPU
@@ -72,13 +72,5 @@ if __name__ == '__main__':
 
             correct += int(torch.sum(torch.argmax(output, dim=1) == target))
             total += len(target)
-
-            # 梯度清零；反向传播；
-            optimizer.zero_grad()
-            loss = F.cross_entropy(output, target)  # 交叉熵损失函数；
-            epoch_loss += loss.item()
-            loss.backward()
-            optimizer.step()
-
         loss = epoch_loss / (batch_idx + 1)
-        print('epoch:%s' % epoch, 'accuracy：%.3f%%' % (correct * 100 / total), 'loss = %s' % loss)
+        print('epoch:%s' % epoch, 'accuracy：%.3f%%' % (correct * 100 / total))
