@@ -4,6 +4,7 @@ from load import DataUtil
 import torch.nn.functional as F
 import argparse
 from tqdm import tqdm
+from visdom import Visdom
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -15,8 +16,10 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.1, help='dropout rate')
     parser.add_argument('--manual_stop', '-m', dest='manual_stop', action='store_true', help='stop manually')
 
-
     args = parser.parse_args()
+
+    vis =Visdom(env='Text_Classification')
+    vis.line([0.], [0.], win='train_loss', opts=dict(title='train loss'))
 
     word2vec_path = 'Dataset/wiki_word2vec_50.bin'
     train_path = 'Dataset/train.txt'
@@ -37,7 +40,7 @@ if __name__ == '__main__':
         cnn = TextCNN(embed, kernel_sizes, nums_channels, 0.1)
         net = cnn.to(device)
     elif args.model == 'mlp':
-        net = MLP(embed, [10000, 1000, 1000], 3, 0.1).to(device)
+        net = MLP(embed, 100, 0.1).to(device)
     elif args.model == 'gru':
         net = GRU(embed, 100, 3, 0.1).to(device)
     elif args.model == 'lstm':
@@ -74,15 +77,17 @@ if __name__ == '__main__':
                 epoch_loss += loss.item()
                 loss.backward()
                 optimizer.step()
+                loss = epoch_loss / (batch_idx + 1)
+                
+            vis.line([loss], [epoch], win='train_loss', update='append')
 
-            loss = epoch_loss / (batch_idx + 1)
             print('epoch:%s' % epoch, 'accuracy:%.3f%%' % (correct * 100 / total), 'loss = %s' % loss)
             if args.manual_stop:
                 is_continue = input('是否继续训练？（y/n）')
                 if is_continue == 'n':
                     break
 
-        torch.save(net, 'pre_cnn_model.pkl')
+        torch.save(net, 'tmp.pkl')
 
     net.eval()
     print('————————进行验证集验证————————')
