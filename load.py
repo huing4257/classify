@@ -1,17 +1,14 @@
-import random
-import collections
 import torch
 from gensim.models import KeyedVectors
 from torch.utils.data import DataLoader
-from torchvision import datasets
 import torch.utils.data as Data
 
 
 class DataUtil:
-    def __init__(self, word2vec_path, train_path, test_path,valid_path, batch_size):
+    def __init__(self, word2vec_path, train_path, valid_path, test_path, batch_size):
         word2vec = KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
 
-        with open(train_path, 'r',encoding="utf-8") as f:
+        with open(train_path, 'r', encoding="utf-8") as f:
             lines = f.readlines()
             words = []
             for line in lines:
@@ -49,7 +46,7 @@ class DataUtil:
         def pad(x):
             return x[:max_l] if len(x) > max_l else x + [0] * (max_l - len(x))
 
-        with open(path, 'r',encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             reviews = []
             labels = []
