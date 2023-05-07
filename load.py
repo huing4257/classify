@@ -8,7 +8,7 @@ import torch.utils.data as Data
 
 
 class DataUtil:
-    def __init__(self, word2vec_path, train_path, test_path, batch_size):
+    def __init__(self, word2vec_path, train_path, test_path,valid_path, batch_size):
         word2vec = KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
 
         with open(train_path, 'r',encoding="utf-8") as f:
@@ -34,9 +34,11 @@ class DataUtil:
 
         self.train_set, _ = self.process_corpus(train_path)
         self.test_set, _ = self.process_corpus(test_path)
+        self.valid_set, _ = self.process_corpus(valid_path)
 
         self.train_iter = DataLoader(self.train_set, batch_size, shuffle=True)
         self.test_iter = DataLoader(self.test_set, batch_size)
+        self.valid_iter = DataLoader(self.valid_set, batch_size)
 
     def word_to_id(self, word):
         return self.word2idx[word] if self.word2idx[word] else 0
