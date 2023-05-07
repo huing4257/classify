@@ -6,6 +6,34 @@ import argparse
 from tqdm import tqdm
 from visdom import Visdom
 
+
+def get_acc_f1(data_iter):
+    for epoch_id in range(1):
+        correct1 = 0
+        total1 = 0
+        tp = 0
+        fp = 0
+        p = 0
+        for batch_id, (data1, target1) in enumerate(data_iter):
+            data1 = torch.as_tensor(data1, dtype=torch.long)
+            target1 = target1.long()
+            data1, target1 = data1.to(device), target1.to(device)
+            out = net(data1)
+
+            out = torch.argmax(out, dim=1)
+
+            correct1 += int(torch.sum(out == target1))
+            total1 += len(target)
+            tp += int(torch.sum(output * target1))
+            fp += int(torch.sum(output * (1 - target1)))
+            p += int(torch.sum(target))
+
+        precision = tp / (tp + fp)
+        recall = tp / p
+        f1 = 2 * precision * recall / (precision + recall)
+    return correct * 100 / total, f1
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pretrained', '-p', dest='pretrained', action='store_true', help='use pretrained model')
@@ -18,7 +46,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    vis =Visdom(env='Text_Classification')
+    vis = Visdom(env='Text_Classification')
     vis.line([0.], [0.], win='train_loss', opts=dict(title='train loss'))
 
     word2vec_path = 'Dataset/wiki_word2vec_50.bin'
@@ -54,7 +82,7 @@ if __name__ == '__main__':
     if args.pretrained:
         net = torch.load(f'pre_{args.model}_model.pkl')
     else:
-        print('——————————进行训练———————————')
+        print('--------train--------')
         for epoch in range(num_epochs):
             correct = 0
             total = 0
@@ -77,11 +105,14 @@ if __name__ == '__main__':
                 epoch_loss += loss.item()
                 loss.backward()
                 optimizer.step()
-                loss = epoch_loss / (batch_idx + 1)
-                
+
+            loss = epoch_loss / (batch_idx + 1)
             vis.line([loss], [epoch], win='train_loss', update='append')
 
             print('epoch:%s' % epoch, 'accuracy:%.3f%%' % (correct * 100 / total), 'loss = %s' % loss)
+            valid_acc, f1 = get_acc_f1(valid_iter)
+            print('valid_acc:%.3f%%' % valid_acc)
+            print(f'f1:{f1}')
             if args.manual_stop:
                 is_continue = input('是否继续训练？（y/n）')
                 if is_continue == 'n':
@@ -90,60 +121,8 @@ if __name__ == '__main__':
         torch.save(net, 'tmp.pkl')
 
     net.eval()
-    print('————————进行验证集验证————————')
-    for epoch in range(1):
-        correct = 0
-        total = 0
-        tp = 0
-        fp = 0
-        p = 0
-        epoch_loss = 0
-        batch_idx = 0
-        for batch_idx, (data, target) in enumerate(valid_iter):
-            data = torch.as_tensor(data, dtype=torch.long)
-            target = target.long()
-            data, target = data.to(device), target.to(device)
-            output = net(data)
 
-            output = torch.argmax(output, dim=1)
-
-            correct += int(torch.sum(output == target))
-            total += len(target)
-            tp += int(torch.sum(output * target))
-            fp += int(torch.sum(output * (1 - target)))
-            p += int(torch.sum(target))
-
-        print('accuracy:%.3f%%' % (correct * 100 / total))
-        precision = tp / (tp + fp)
-        recall = tp / p
-        f1 = 2 * precision * recall / (precision + recall)
-        print(f'f1:{f1}')
-
-    print('————————进行测试集验证————————')
-    for epoch in range(1):
-        correct = 0
-        total = 0
-        epoch_loss = 0
-        tp = 0
-        fp = 0
-        p = 0
-        batch_idx = 0
-        for batch_idx, (data, target) in enumerate(test_iter):
-            data = torch.as_tensor(data, dtype=torch.long)
-            target = target.long()
-            data, target = data.to(device), target.to(device)
-            output = net(data)
-
-            output = torch.argmax(output, dim=1)
-
-            correct += int(torch.sum(output == target))
-            total += len(target)
-            tp += int(torch.sum(output * target))
-            fp += int(torch.sum(output * (1 - target)))
-            p += int(torch.sum(target))
-
-        print('accuracy:%.3f%%' % (correct * 100 / total))
-        precision = tp / (tp + fp)
-        recall = tp / p
-        f1 = 2 * precision * recall / (precision + recall)
-        print(f'f1:{f1}')
+    print('--------test--------')
+    acc, f1 = get_acc_f1(test_iter)
+    print('accuracy:%.3f%%' % acc)
+    print(f'f1:{f1}')
