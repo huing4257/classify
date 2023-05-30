@@ -36,23 +36,6 @@ class TextCNN(nn.Module):
         cat = self.dropout(torch.cat(pooled, dim=1))
 
         return self.fc(cat)
-
-class GRU(nn.Module):
-    def __init__(self, embedding, hidden_dim, num_layers, dropout):
-        super(GRU, self).__init__()
-        self.embedding = nn.Embedding.from_pretrained(embedding, freeze=False)
-        self.gru = nn.GRU(input_size=self.embedding.embedding_dim,
-                          hidden_size=hidden_dim,
-                          num_layers=num_layers,
-                          dropout=dropout,
-                          batch_first=True,
-                          bidirectional=True)
-        self.fc = nn.Linear(hidden_dim * 2, 2)
-
-    def forward(self, inputs):
-        embedded = self.embedding(inputs)
-        output, h_n = self.gru(embedded)
-        return self.fc(torch.cat([h_n[-2, :, :], h_n[-1, :, :]], dim=1))
     
 class LSTM(nn.Module):
     def __init__(self, embedding, hidden_dim, num_layers, dropout):

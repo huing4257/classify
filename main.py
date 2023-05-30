@@ -1,53 +1,50 @@
-from model import LSTM, TextCNN, MLP, GRU
+from model import LSTM, TextCNN, MLP
 import torch
 from load import DataUtil
 import torch.nn.functional as F
 import argparse
 from tqdm import tqdm
-from visdom import Visdom
+
 
 
 def get_acc_f1(data_iter):
-    for epoch_id in range(1):
-        correct1 = 0
-        total1 = 0
-        tp = 0
-        fp = 0
-        p = 0
-        for batch_id, (data1, target1) in enumerate(data_iter):
-            data1 = torch.as_tensor(data1, dtype=torch.long)
-            target1 = target1.long()
-            data1, target1 = data1.to(device), target1.to(device)
-            out = net(data1)
+    correct = 0
+    total = 0
+    tp = 0
+    fp = 0
+    p = 0
+    for batch_id, (data, target) in enumerate(data_iter):
+        data = torch.as_tensor(data, dtype=torch.long)
+        target = target.long()
+        data, target = data.to(device), target.to(device)
+        output = net(data)
 
-            out = torch.argmax(out, dim=1)
+        output = torch.argmax(output, dim=1)
 
-            correct1 += int(torch.sum(out == target1))
-            total1 += len(target)
-            tp += int(torch.sum(output * target1))
-            fp += int(torch.sum(output * (1 - target1)))
-            p += int(torch.sum(target))
+        correct += int(torch.sum(output == target))
+        total += len(target)
+        tp += int(torch.sum(output * target))
+        fp += int(torch.sum(output * (1 - target)))
+        p += int(torch.sum(target))
 
-        precision = tp / (tp + fp)
-        recall = tp / p
-        f1 = 2 * precision * recall / (precision + recall)
+    precision = tp / (tp + fp)
+    recall = tp / p
+    f1 = 2 * precision * recall / (precision + recall)
     return correct * 100 / total, f1
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pretrained', '-p', dest='pretrained', action='store_true', help='use pretrained model')
-    parser.add_argument('--model', type=str, default='cnn', choices=['cnn', 'mlp', 'gru', 'lstm'], help='model type')
+    parser.add_argument('--model', type=str, default='cnn', choices=['cnn', 'mlp', 'lstm'], help='model type')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--lr', type=float, default=0.005, help='learning rate')
     parser.add_argument('--epoch', type=int, default=5, help='epoch')
     parser.add_argument('--dropout', type=float, default=0.1, help='dropout rate')
     parser.add_argument('--manual_stop', '-m', dest='manual_stop', action='store_true', help='stop manually')
+    parser.add_argument('--hidden_dim', type=int, default=100, help='hidden dimension')
 
     args = parser.parse_args()
-
-    vis = Visdom(env='Text_Classification')
-    vis.line([0.], [0.], win='train_loss', opts=dict(title='train loss'))
 
     word2vec_path = 'Dataset/wiki_word2vec_50.bin'
     train_path = 'Dataset/train.txt'
@@ -61,18 +58,18 @@ if __name__ == '__main__':
     valid_iter = data_util.valid_iter
 
     lr, num_epochs = args.lr, args.epoch
+    dropout = args.dropout
+    hidden_dim = args.hidden_dim
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net = None
     if args.model == 'cnn':
         embed_size, kernel_sizes, nums_channels = 100, [3, 4, 5], [100, 100, 100]
-        cnn = TextCNN(embed, kernel_sizes, nums_channels, 0.1)
+        cnn = TextCNN(embed, kernel_sizes, nums_channels, dropout)
         net = cnn.to(device)
     elif args.model == 'mlp':
-        net = MLP(embed, 100, 0.1).to(device)
-    elif args.model == 'gru':
-        net = GRU(embed, 100, 3, 0.1).to(device)
+        net = MLP(embed, 100, dropout).to(device)
     elif args.model == 'lstm':
-        net = LSTM(embed, 100, 3, 0.1).to(device)
+        net = LSTM(embed, hidden_dim, 3, dropout).to(device)
 
     if net is None:
         raise ValueError('model type error')
@@ -80,7 +77,7 @@ if __name__ == '__main__':
     loss_fn = torch.nn.CrossEntropyLoss()
 
     if args.pretrained:
-        net = torch.load(f'pre_{args.model}_model.pkl')
+        net = torch.load(f'{args.model}.pkl')
     else:
         print('--------train--------')
         for epoch in range(num_epochs):
@@ -107,7 +104,6 @@ if __name__ == '__main__':
                 optimizer.step()
 
             loss = epoch_loss / (batch_idx + 1)
-            vis.line([loss], [epoch], win='train_loss', update='append')
 
             print('epoch:%s' % epoch, 'accuracy:%.3f%%' % (correct * 100 / total), 'loss = %s' % loss)
             valid_acc, f1 = get_acc_f1(valid_iter)
